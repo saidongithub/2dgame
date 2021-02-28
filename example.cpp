@@ -20,7 +20,7 @@ int main(){
 	doge_window_t* window;
 
 	window = doge_window_create("Said", 800, 600);
-	
+
 	if(!window){
 		printf("Failed to create window\n");
 
@@ -28,7 +28,7 @@ int main(){
 	}
 
 	doge_window_makecurrentcontext(window);
-	
+
 	error = glewInit();
 
 	if(error){
@@ -37,7 +37,7 @@ int main(){
 
 		return -1;
 	}
-	
+
 	doge_image_t* image;
 	int image_width, image_height;
 
@@ -51,7 +51,7 @@ int main(){
 
 		/* set the color to white */
 		doge_setcolor(1.0f, 1.0f, 1.0f);
-		
+
 		/* draw a line from (0, 0) to (800, 600) */
 		doge_draw_line(0, 0, 800, 600);
 
