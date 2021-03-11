@@ -210,7 +210,7 @@ int main(){
 
 		//check if mouse is within window
 		if(mouse_x >= 0 && mouse_y >= 0 && mouse_x_tile < 8 && mouse_y_tile < 8){
-			//check if change in mouse click state
+			//click update
 			if(mouse_clicked != doge_window_mousepressed(window, DOGE_MOUSE_BUTTON_LEFT)){
 				//if the mouse went from normal to pushed (was pushed)
 				if(!mouse_clicked){
@@ -228,17 +228,25 @@ int main(){
 					selected_x = click_x;
 					selected_y = click_y;
 					selected = board[selected_x][selected_y];
+				} else if(selected && !mouse_clicked && click_x != selected_x && click_y != selected_y){
+					//if clicking on new piece, move on click
+					piece_free(board[click_x][click_y]);
+					board[click_x][click_y] = selected;
+					board[selected_x][selected_y] = nullptr;
+					selected = nullptr;
 				}
 				//if piece selected and mouse was released
 				else if(selected && mouse_clicked){
-					//if mouse on selected piece's tile
-					if(release_x == selected_x && release_y == selected_y){
-						selected = nullptr;
-					}
-					//if mouse on another piece's tile, take piece
-					else {
+					if(release_x != selected_x || release_y != selected_y){
+						//if mouse on another piece's tile, take piece
 						piece_free(board[release_x][release_y]);
 						board[release_x][release_y] = selected;
+						board[selected_x][selected_y] = nullptr;
+						selected = nullptr;
+					} else
+					//if clicking on same piece, deselect
+					if(selected && !mouse_clicked && release_x == selected_x && release_y == selected_y){
+						board[click_x][click_y] = board[selected_x][selected_y];
 						board[selected_x][selected_y] = nullptr;
 						selected = nullptr;
 					}
@@ -247,6 +255,8 @@ int main(){
 			}
 		} else if(mouse_clicked && !doge_window_mousepressed(window, DOGE_MOUSE_BUTTON_LEFT)){
 			selected = nullptr;
+			selected_x = -1;
+			selected_y = -1;
 		}
 
 		//draws chess board
@@ -263,8 +273,9 @@ int main(){
 
 				//draw pieces on board by location
 				doge_setcolor(1, 1, 1);
-				if(board[x][7 - y])
+				if(board[x][7 - y]){
 					doge_draw_image(piecevisual[board[x][7 - y] -> type][board[x][7 - y] -> color] -> image, x * tile_size, y * tile_size, tile_size, tile_size);
+				}
 			}
 		}
 		//if mouse held down and piece selected
@@ -281,7 +292,6 @@ int main(){
 			//draw selected piece at cursor to give illusion of holding piece
 			doge_draw_image(piecevisual[selected -> type][selected -> color] -> image, mouse_x - tile_size / 2, mouse_y - tile_size / 2, tile_size, tile_size);
 		}
-
         /* swap the frame buffer */
         doge_window_render(window);
 
