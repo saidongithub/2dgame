@@ -228,8 +228,8 @@ int main(){
 					selected_x = click_x;
 					selected_y = click_y;
 					selected = board[selected_x][selected_y];
-				} else if(selected && !mouse_clicked && click_x != selected_x && click_y != selected_y){
-					//if clicking on new piece, move on click
+				} else if(selected && !mouse_clicked && (click_x != selected_x || click_y != selected_y)){
+					//if clicking on new tile, move on click
 					piece_free(board[click_x][click_y]);
 					board[click_x][click_y] = selected;
 					board[selected_x][selected_y] = nullptr;
