@@ -15,8 +15,9 @@ const int ROOK = 3;
 const int QUEEN = 4;
 const int KING = 5;
 
-const int WHITE = 1;
+
 const int BLACK = 0;
+const int WHITE = 1;
 
 typedef struct asset_s{
 	doge_image_t* image;
@@ -117,6 +118,7 @@ int pawncanmove(int color, int x1, int y1, int x2, int y2){
 }
 
 int bishopcanmove(int x1, int y1, int x2, int y2){
+	//if not moving diagonally
 	if(abs(x2 - x1) != abs(y2 - y1)){
 		return 0;
 	}
@@ -128,6 +130,7 @@ int bishopcanmove(int x1, int y1, int x2, int y2){
 	if(y2 < y1){
 		dy = -1;
 	}
+	//if piece obstructing path of diagonal
 	for(int i = 1; i < abs(x2 - x1); i++){
 		if(board[x1 + dx * i][y1 + dy * i]){
 			return 0;
@@ -137,6 +140,7 @@ int bishopcanmove(int x1, int y1, int x2, int y2){
 }
 
 int knightcanmove(int x1, int y1, int x2, int y2){
+	//if moving 2 tiles in a direction and 1 tile perpendicular
 	if((abs(x2 - x1) == 2 && abs(y2 - y1) == 1) || (abs(x2-x1) == 1 && abs(y2-y1) == 2)){
 		return 1;
 	}
@@ -144,7 +148,31 @@ int knightcanmove(int x1, int y1, int x2, int y2){
 }
 
 int rookcanmove(int x1, int y1, int x2, int y2){
-	return 0;
+	if(x2 != x1 && y2 != y1){
+		return 0;
+	}
+	//if moving in more than one direction
+	int dx = 0;
+	int dy = 1;
+	if(y2 == y1){
+		dy = 0;
+	} else
+	if(y2 < y1){
+		dy = -1;
+	}
+	if(x2 > x1){
+		dx = 1;
+	} else
+	if(x2 < x1){
+		dx = -1;
+	}
+	//if piece obstructing path of rook
+	for(int i = 1; i < abs(x2-x1 + y2-y1); i++){
+		if(board[x1 + dx * i][y1 + dy * i]){
+			return 0;
+		}
+	}
+	return 1;
 }
 
 int queencanmove(int x1, int y1, int x2, int y2){
