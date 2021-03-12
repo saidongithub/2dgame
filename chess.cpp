@@ -90,6 +90,10 @@ piece* board[8][8];
 
 const int tile_size = 150;
 
+doge_image_t* piece_image(piece* piece){
+	return piecevisual[piece -> type][piece -> color] -> image;
+}
+
 int pawncanmove(int color, int x1, int y1, int x2, int y2){
 	//if moving one tile in y
 	if((color == WHITE && y2 == y1 + 1) || (color == BLACK && y2 == y1 - 1)){
@@ -113,10 +117,29 @@ int pawncanmove(int color, int x1, int y1, int x2, int y2){
 }
 
 int bishopcanmove(int x1, int y1, int x2, int y2){
-	return 0;
+	if(abs(x2 - x1) != abs(y2 - y1)){
+		return 0;
+	}
+	int dx = 1;
+	int dy = 1;
+	if(x2 < x1){
+		dx = -1;
+	}
+	if(y2 < y1){
+		dy = -1;
+	}
+	for(int i = 1; i < abs(x2 - x1); i++){
+		if(board[x1 + dx * i][y1 + dy * i]){
+			return 0;
+		}
+	}
+	return 1;
 }
 
 int knightcanmove(int x1, int y1, int x2, int y2){
+	if((abs(x2 - x1) == 2 && abs(y2 - y1) == 1) || (abs(x2-x1) == 1 && abs(y2-y1) == 2)){
+		return 1;
+	}
 	return 0;
 }
 
@@ -256,7 +279,7 @@ int main(){
 		}
 	}
 
-	//mass declaration for graphics related variables
+	//mass declaration of variables
 	int mouse_x, mouse_y;
 	int mouse_x_tile = 0;
 	int mouse_y_tile = 0;
@@ -305,12 +328,12 @@ int main(){
 					selected_y = click_y;
 					selected = board[selected_x][selected_y];
 				}else
-				if(selected && !mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
+				if(selected && board[click_x][click_y] != selected && !mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
 					selected_x = click_x;
 					selected_y = click_y;
 					selected = board[selected_x][selected_y];
 				}else
-				if(selected && !mouse_clicked && (click_x != selected_x || click_y != selected_y) && canmove(selected, selected_x, selected_y, click_x, click_y)){
+				if(selected && !mouse_clicked && canmove(selected, selected_x, selected_y, click_x, click_y)){
 					//if clicking on new tile, move piece
 					piece_free(board[click_x][click_y]);
 					board[click_x][click_y] = selected;
@@ -327,7 +350,7 @@ int main(){
 				else
 				//if piece selected and mouse was released
 				if(selected && mouse_clicked){
-					if((release_x != selected_x || release_y != selected_y) && canmove(selected, selected_x, selected_y, release_x, release_y)){
+					if(canmove(selected, selected_x, selected_y, release_x, release_y)){
 						//if mouse on another piece's tile, take piece
 						piece_free(board[release_x][release_y]);
 						board[release_x][release_y] = selected;
@@ -363,7 +386,7 @@ int main(){
 				//draw pieces on board by location
 				doge_setcolor(1, 1, 1);
 				if(board[x][7 - y]){
-					doge_draw_image(piecevisual[board[x][7 - y] -> type][board[x][7 - y] -> color] -> image, x * tile_size, y * tile_size, tile_size, tile_size);
+					doge_draw_image(piece_image(board[x][7-y]), x * tile_size, y * tile_size, tile_size, tile_size);
 				}
 			}
 		}
@@ -389,9 +412,9 @@ int main(){
 			doge_setcolor(1, 1, 1);
 			//draw selected piece at cursor to give illusion of holding piece
 			if(mouse_clicked){
-				doge_draw_image(piecevisual[selected -> type][selected -> color] -> image, mouse_x - tile_size / 2, mouse_y - tile_size / 2, tile_size, tile_size);
+				doge_draw_image(piece_image(selected), mouse_x - tile_size / 2, mouse_y - tile_size / 2, tile_size, tile_size);
 			} else{
-				doge_draw_image(piecevisual[selected -> type][selected -> color] -> image, selected_x * tile_size, (7 - selected_y) * tile_size, tile_size, tile_size);
+				doge_draw_image(piece_image(selected), selected_x * tile_size, (7 - selected_y) * tile_size, tile_size, tile_size);
 			}
 		}
         /* swap the frame buffer */
