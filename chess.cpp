@@ -28,7 +28,7 @@ typedef struct asset_s{
 typedef struct piece{
 	int type;
 	int color;
-	int castle;
+	int cancastle;
 } piece;
 
 piece* piece_make(int type, int color){
@@ -43,9 +43,9 @@ piece* piece_make(int type, int color){
 	newpiece -> type = type;
 	newpiece -> color = color;
 	if(type == ROOK || type == KING){
-		newpiece -> castle = 1;
+		newpiece -> cancastle = 1;
 	} else{
-		newpiece -> castle = 0;
+		newpiece -> cancastle = 0;
 	}
 	return newpiece;
 }
@@ -91,6 +91,8 @@ piece* board[8][8];
 
 const int tile_size = 150;
 
+const int circle = tile_size / 2.5;
+
 doge_image_t* piece_image(piece* piece){
 	return piecevisual[piece -> type][piece -> color] -> image;
 }
@@ -109,7 +111,7 @@ int pawncanmove(int color, int x1, int y1, int x2, int y2){
 	} else
 	//moving 2 from starting
 	if((y1 == 1 && y2 == 3 && color == WHITE) || (y1 == 6 && y2 == 4 && color == BLACK)){
-		if(!board[x2][y2] && x2 == x1){
+		if(!board[x2][y2] && x2 == x1 && !board[x2][y1 + (y2 - y1) / 2]){
 			return 1;
 		}
 	}
@@ -148,10 +150,10 @@ int knightcanmove(int x1, int y1, int x2, int y2){
 }
 
 int rookcanmove(int x1, int y1, int x2, int y2){
+	//if moving in more than one direction
 	if(x2 != x1 && y2 != y1){
 		return 0;
 	}
-	//if moving in more than one direction
 	int dx = 0;
 	int dy = 1;
 	if(y2 == y1){
@@ -176,10 +178,44 @@ int rookcanmove(int x1, int y1, int x2, int y2){
 }
 
 int queencanmove(int x1, int y1, int x2, int y2){
+	if(x2 == x1 || y2 == y1){
+		return rookcanmove(x1, y1, x2, y2);
+	} else
+	if(abs(x2-x1) == abs(y2-y1)){
+		return bishopcanmove(x1, y1, x2, y2);
+	}
 	return 0;
 }
 
 int kingcanmove(int x1, int y1, int x2, int y2){
+	//move 1 tile any direction
+	if(abs(x2-x1) < 2 && abs(y2-y1) < 2){
+		return 1;
+	}
+	return 0;
+}
+
+int kingcancastle(piece* king, int x1, int y, int x2){
+	if(king -> cancastle){
+		int x = 7;
+		int dx = 1;
+		if(x2 == 2){
+			x = 0;
+			dx = -1;
+		} else
+		if(x2 != 6){
+			return 0;
+		}
+		if(board[x][y]){
+			if(board[x][y] -> cancastle){
+				if(rookcanmove(x, y, x2 + dx, y)){
+					board[x2 + dx][y] = board[x][y];
+					board[x][y] = nullptr;
+					return 1;
+				}
+			}
+		}
+	}
 	return 0;
 }
 
@@ -199,14 +235,21 @@ int canmove(piece* piece, int x1, int y1, int x2, int y2){
 		return knightcanmove(x1, y1, x2, y2);
 	} else
 	if(piece -> type == ROOK){
+		piece -> cancastle = 0;
 		return rookcanmove(x1, y1, x2, y2);
 	} else
 	if(piece -> type == QUEEN){
 		return queencanmove(x1, y1, x2, y2);
 	} else
 	if(piece -> type == KING){
-		return kingcanmove(x1, y1, x2, y2);
+		if(kingcanmove(x1, y1, x2, y2)){
+			piece -> cancastle = 0;
+			return 1;
+		} else{
+			return kingcancastle(piece, x1, y1, x2);
+		}
 	}
+	return 0;
 }
 
 int main(){
@@ -324,13 +367,13 @@ int main(){
 
 	int firstclick = 0;
 
-	int turn = 1;
+	int turn = WHITE;
 
     while(!doge_window_shouldclose(window)){
         /* clear the window */
         doge_clear();
 
-		//set mousex and mousey to mouse's x and y position relative to window's 0,0
+		//set mouse_x and mouse_y to mouse's x and y position relative to window's 0,0
 		doge_window_getcursorpos(window, &mouse_x, &mouse_y);
 		mouse_x_tile = mouse_x / tile_size;
 		mouse_y_tile = 7 - mouse_y / tile_size;
@@ -349,35 +392,44 @@ int main(){
 					release_x = mouse_x_tile;
 					release_y = mouse_y_tile;
 				}
-				//if no piece selected and mouse was pushed
-				if(!selected && !mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
-					//select piece that is left clicked
-					selected_x = click_x;
-					selected_y = click_y;
-					selected = board[selected_x][selected_y];
-				}else
-				if(selected && board[click_x][click_y] != selected && !mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
-					selected_x = click_x;
-					selected_y = click_y;
-					selected = board[selected_x][selected_y];
-				}else
-				if(selected && !mouse_clicked && canmove(selected, selected_x, selected_y, click_x, click_y)){
-					//if clicking on new tile, move piece
-					piece_free(board[click_x][click_y]);
-					board[click_x][click_y] = selected;
-					board[selected_x][selected_y] = nullptr;
-					selected = nullptr;
-					turn = 1 - turn;
-				}else
-				if(selected && !mouse_clicked && click_x == selected_x && click_y == selected_y){
-					//if clicking selected piece and it's already clicked then deselect
-					if(firstclick){
-						selected = nullptr;
+				//if not selecting a piece
+				if(!selected){
+					//if clicking on allied piece
+					if(!mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
+						//select piece that is left clicked
+						selected_x = click_x;
+						selected_y = click_y;
+						selected = board[selected_x][selected_y];
 					}
-				}
-				else
-				//if piece selected and mouse was released
-				if(selected && mouse_clicked){
+				} else{
+					//if piece selected and clicking
+					if(!mouse_clicked){
+						//if clicking allied piece while piece selected
+						if(board[click_x][click_y] && board[click_x][click_y] != selected && board[click_x][click_y] -> color == turn){
+							//select piece
+							selected_x = click_x;
+							selected_y = click_y;
+							selected = board[selected_x][selected_y];
+						} else
+						//if moving piece via click
+						if(canmove(selected, selected_x, selected_y, click_x, click_y)){
+							//"take" any pieces at destination
+							piece_free(board[click_x][click_y]);
+							board[click_x][click_y] = selected;
+							board[selected_x][selected_y] = nullptr;
+							selected = nullptr;
+							//change turns
+							turn = !turn;
+						} else
+						//if clicking on selected piece
+						if(click_x == selected_x && click_y == selected_y){
+							//deselect
+							if(firstclick){
+								selected = nullptr;
+							}
+						}
+					} else
+					//if moving piece via click and drag
 					if(canmove(selected, selected_x, selected_y, release_x, release_y)){
 						//if mouse on another piece's tile, take piece
 						piece_free(board[release_x][release_y]);
@@ -422,7 +474,7 @@ int main(){
 		for(int x = 0; x < 8; x++){
 			for(int y = 0; y < 8; y++){
 				if(selected && canmove(selected, selected_x, selected_y, x, y)){
-					doge_fill_ellipse(x * tile_size, (7 - y) * tile_size + tile_size / 4, tile_size / 2, tile_size / 2);
+					doge_fill_ellipse(x * tile_size + tile_size / 2 - circle / 2, (7 - y) * tile_size + tile_size / 2 - circle / 2, circle, circle);
 				}
 			}
 		}
@@ -458,7 +510,7 @@ int main(){
 		}
 	}
 	//free all assets
-	for(int type = 0; type < 6; type++){
+	for(int type = PAWN; type <= KING; type++){
 		asset_free(piecevisual[type][0]);
 		asset_free(piecevisual[type][1]);
 	}
