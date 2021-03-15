@@ -15,7 +15,6 @@ const int ROOK = 3;
 const int QUEEN = 4;
 const int KING = 5;
 
-
 const int BLACK = 0;
 const int WHITE = 1;
 
@@ -91,9 +90,9 @@ asset* piecevisual[6][2];
 
 piece* board[8][8];
 
-const int tile_size = 150;
+const int tile = 150;
 
-const int circle = tile_size / 2.5;
+const int circle = tile / 2.5;
 
 doge_image_t* piece_image(piece* piece){
 	return piecevisual[piece -> type][piece -> color] -> image;
@@ -280,10 +279,6 @@ void movepiece(int x1, int y1, int x2, int y2){
 	board[x1][y1] = nullptr;
 }
 
-void passant(){
-
-}
-
 void castle(int x1, int y1, int x2){
 	int dx = -1;
 	if(x1 < x2){
@@ -315,6 +310,25 @@ void checkmove(piece* selected, int selected_x, int selected_y, int destination_
 	}
 }
 
+int upgradepawn(piece* piece, int y){
+	if(piece -> type == PAWN){
+		if((piece -> color == WHITE && y == 7) || (piece -> color == BLACK && y == 0)){
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void drawupgrades(int color, int x, int y){
+	int tilehalf = tile / 2;
+	int x_tile = x * tile;
+	int y_tile = (7 - y) * tile;
+	doge_draw_image(piecevisual[QUEEN][color] -> image, x_tile, y_tile, tilehalf, tilehalf);
+	doge_draw_image(piecevisual[ROOK][color] -> image, x_tile + tilehalf, y_tile, tilehalf, tilehalf);
+	doge_draw_image(piecevisual[BISHOP][color] -> image, x_tile, y_tile + tilehalf, tilehalf, tilehalf);
+	doge_draw_image(piecevisual[KNIGHT][color] -> image, x_tile + tilehalf, y_tile + tilehalf, tilehalf, tilehalf);
+}
+
 int main(){
     int error;
 
@@ -328,7 +342,7 @@ int main(){
 
     doge_window_t* window;
 
-    window = doge_window_create("Said chess", 8 * tile_size, 8 * tile_size);
+    window = doge_window_create("Said chess", 8 * tile, 8 * tile);
 
     if(!window){
         printf("Failed to create window\n");
@@ -432,14 +446,18 @@ int main(){
 
 	int turn = WHITE;
 
+	int upgrading = 0;
+	int upgrading_x = -1;
+	int upgrading_y = -1;
+
     while(!doge_window_shouldclose(window)){
         /* clear the window */
         doge_clear();
 
 		//set mouse_x and mouse_y to mouse's x and y position relative to window's 0,0
 		doge_window_getcursorpos(window, &mouse_x, &mouse_y);
-		mouse_x_tile = mouse_x / tile_size;
-		mouse_y_tile = 7 - mouse_y / tile_size;
+		mouse_x_tile = mouse_x / tile;
+		mouse_y_tile = 7 - mouse_y / tile;
 
 		//check if mouse is within window
 		if(mouse_x >= 0 && mouse_y >= 0 && mouse_x_tile < 8 && mouse_y_tile < 8){
@@ -455,57 +473,74 @@ int main(){
 					release_x = mouse_x_tile;
 					release_y = mouse_y_tile;
 				}
-				//if not selecting a piece
-				if(!selected){
-					//if clicking on allied piece
-					if(!mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
-						//select piece that is left clicked
-						selected_x = click_x;
-						selected_y = click_y;
-						selected = board[selected_x][selected_y];
-					}
-				} else{
-					//if piece selected and clicking
-					if(!mouse_clicked){
-						//if clicking allied piece while piece selected
-						if(board[click_x][click_y] && board[click_x][click_y] != selected && board[click_x][click_y] -> color == turn){
-							//select piece
+				if(!upgrading){
+					//if not selecting a piece
+					if(!selected){
+						//if clicking on allied piece
+						if(!mouse_clicked && board[click_x][click_y] && board[click_x][click_y] -> color == turn){
+							//select piece that is left clicked
 							selected_x = click_x;
 							selected_y = click_y;
 							selected = board[selected_x][selected_y];
-						} else
-						//if moving piece via click
-						if(canmove(selected, selected_x, selected_y, click_x, click_y)){
-							//check if piece statuses changing
-							checkmove(selected, selected_x, selected_y, click_x, click_y);
-							//"take" any pieces at destination
-							movepiece(selected_x, selected_y, click_x, click_y);
-							//deselect piece
-							selected = nullptr;
-							//change turns
-							turn = !turn;
-						} else
-						//if clicking on selected piece
-						if(click_x == selected_x && click_y == selected_y){
-							//deselect
-							if(firstclick){
-								selected = nullptr;
-							}
 						}
-					} else
-					//if moving piece via click and drag
-					if(canmove(selected, selected_x, selected_y, release_x, release_y)){
-						//check if piece statuses changing
-						checkmove(selected, selected_x, selected_y, release_x, release_y);
-						//if mouse on another piece's tile, take piece
-						movepiece(selected_x, selected_y, release_x, release_y);
-						//deselect
-						selected = nullptr;
-						//change turns
-						turn = !turn;
-					} else
-					if(!firstclick){
-						firstclick = 1;
+					} else{
+						//if piece selected and clicking
+						if(!mouse_clicked){
+							//if clicking allied piece while piece selected
+							if(board[click_x][click_y] && board[click_x][click_y] != selected && board[click_x][click_y] -> color == turn){
+								//select piece
+								selected_x = click_x;
+								selected_y = click_y;
+								selected = board[selected_x][selected_y];
+							} else
+							//if moving piece via click
+							if(canmove(selected, selected_x, selected_y, click_x, click_y)){
+								//check if piece statuses changing
+								checkmove(selected, selected_x, selected_y, click_x, click_y);
+								//"take" any pieces at destination
+								movepiece(selected_x, selected_y, click_x, click_y);
+								//check if pawn should be upgraded
+								if(upgradepawn(selected, click_y)){
+									upgrading = 1;
+									upgrading_x = click_x;
+									upgrading_y = click_y;
+								} else{
+									//change turns
+									turn = !turn;
+								}
+								//deselect piece
+								selected = nullptr;
+
+							} else
+							//if clicking on selected piece
+							if(click_x == selected_x && click_y == selected_y){
+								//deselect
+								if(firstclick){
+									selected = nullptr;
+								}
+							}
+						} else
+						//if moving piece via click and drag
+						if(canmove(selected, selected_x, selected_y, release_x, release_y)){
+							//check if piece statuses changing
+							checkmove(selected, selected_x, selected_y, release_x, release_y);
+							//if mouse on another piece's tile, take piece
+							movepiece(selected_x, selected_y, release_x, release_y);
+							//check if pawn should be upgraded
+								if(upgradepawn(selected, release_y)){
+									upgrading = 1;
+									upgrading_x = release_x;
+									upgrading_y = release_y;
+								} else{
+									//change turns
+									turn = !turn;
+								}
+								//deselect piece
+								selected = nullptr;
+						} else
+						if(!firstclick){
+							firstclick = 1;
+						}
 					}
 				}
 				mouse_clicked = doge_window_mousepressed(window, DOGE_MOUSE_BUTTON_LEFT);
@@ -521,22 +556,28 @@ int main(){
 			for(int x = 0; x < 8; x++){
 				//alternate tile colors
 				if((x + y) % 2){
-					doge_setcolor(0.2, 0.6, 0.2);
+					doge_setcolor(0.94, 0.85, 0.75);
 				} else {
-					doge_setcolor(0.5, 0.8, 0.5);
+					doge_setcolor(0.73, 0.33, 0.28);
 				}
 				//draw tiles
-				doge_fill_rectangle(x * tile_size, y * tile_size, tile_size, tile_size);
+				doge_fill_rectangle(x * tile, y * tile, tile, tile);
 
 				//draw pieces on board by location
 				doge_setcolor(1, 1, 1);
-				if(board[x][7 - y]){
-					doge_draw_image(piece_image(board[x][7-y]), x * tile_size, y * tile_size, tile_size, tile_size);
+				if(board[x][7 - y] && (x != upgrading_x || 7 - y != upgrading_y)){
+					doge_draw_image(piece_image(board[x][7-y]), x * tile, y * tile, tile, tile);
 					if(board[x][7-y] -> canpassant == 1){
 						if(board[x][7-y] -> color == turn){
 							board[x][7-y] -> canpassant = 0;
 						}
 					}
+				}
+				if(upgrading){
+					doge_setcolor_alpha(1, 1, 1, 0.02);
+					doge_draw_image(piece_image(board[upgrading_x][upgrading_y]), upgrading_x * tile, (7 - upgrading_y) * tile, tile, tile);
+					doge_setcolor(1, 1, 1);
+					drawupgrades(board[upgrading_x][upgrading_y] -> color, upgrading_x, upgrading_y);
 				}
 			}
 		}
@@ -544,7 +585,7 @@ int main(){
 		for(int x = 0; x < 8; x++){
 			for(int y = 0; y < 8; y++){
 				if(selected && canmove(selected, selected_x, selected_y, x, y)){
-					doge_fill_ellipse(x * tile_size + tile_size / 2 - circle / 2, (7 - y) * tile_size + tile_size / 2 - circle / 2, circle, circle);
+					doge_fill_ellipse(x * tile + tile / 2 - circle / 2, (7 - y) * tile + tile / 2 - circle / 2, circle, circle);
 				}
 			}
 		}
@@ -558,13 +599,13 @@ int main(){
 				doge_setcolor(1, 1, 0.85);
 			}
 			//redraw tile over selected piece
-			doge_fill_rectangle(selected_x * tile_size, (7 - selected_y) * tile_size, tile_size, tile_size);
+			doge_fill_rectangle(selected_x * tile, (7 - selected_y) * tile, tile, tile);
 			doge_setcolor(1, 1, 1);
 			//draw selected piece at cursor to give illusion of holding piece
 			if(mouse_clicked){
-				doge_draw_image(piece_image(selected), mouse_x - tile_size / 2, mouse_y - tile_size / 2, tile_size, tile_size);
+				doge_draw_image(piece_image(selected), mouse_x - tile / 2, mouse_y - tile / 2, tile, tile);
 			} else{
-				doge_draw_image(piece_image(selected), selected_x * tile_size, (7 - selected_y) * tile_size, tile_size, tile_size);
+				doge_draw_image(piece_image(selected), selected_x * tile, (7 - selected_y) * tile, tile, tile);
 			}
 		}
         /* swap the frame buffer */
