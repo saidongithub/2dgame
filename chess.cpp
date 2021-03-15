@@ -29,6 +29,7 @@ typedef struct piece{
 	int type;
 	int color;
 	int cancastle;
+	int canpassant;
 } piece;
 
 piece* piece_make(int type, int color){
@@ -47,6 +48,7 @@ piece* piece_make(int type, int color){
 	} else{
 		newpiece -> cancastle = 0;
 	}
+	newpiece -> canpassant = 0;
 	return newpiece;
 }
 
@@ -115,7 +117,6 @@ int pawncanmove(int color, int x1, int y1, int x2, int y2){
 			return 1;
 		}
 	}
-	//en passant here
 	return 0;
 }
 
@@ -195,23 +196,42 @@ int kingcanmove(int x1, int y1, int x2, int y2){
 	return 0;
 }
 
-int kingcancastle(piece* king, int x1, int y, int x2){
-	if(king -> cancastle){
-		int x = 7;
-		int dx = 1;
-		if(x2 == 2){
-			x = 0;
-			dx = -1;
+int pawncanpassant(piece* pawn, int x1, int y1, int x2, int y2){
+	int dy = -1;
+	if(abs(x2 - x1) == 1 && y2 != y1){
+		if(y2 - y1 == 1){
+			dy = 1;
 		} else
-		if(x2 != 6){
+		if(y2 - y1 != -1){
 			return 0;
 		}
-		if(board[x][y]){
-			if(board[x][y] -> cancastle){
-				if(rookcanmove(x, y, x2 + dx, y)){
-					board[x2 + dx][y] = board[x][y];
-					board[x][y] = nullptr;
-					return 1;
+		if((pawn -> color == WHITE && dy != 1) || (pawn -> color == BLACK && dy != -1)){
+			return 0;
+		}
+		if(board[x2][y1] && board[x2][y1] -> canpassant){
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int kingcancastle(piece* king, int x1, int y1, int x2, int y2){
+	if(king -> cancastle){
+		if(y1 == y2){
+			int x = 7;
+			int dx = 1;
+			if(x2 == 2){
+				x = 0;
+				dx = -1;
+			} else
+			if(x2 != 6){
+				return 0;
+			}
+			if(board[x][y1]){
+				if(board[x][y1] -> cancastle){
+					if(rookcanmove(x, y1, x2 + dx, y1)){
+						return 1;
+					}
 				}
 			}
 		}
@@ -226,7 +246,11 @@ int canmove(piece* piece, int x1, int y1, int x2, int y2){
 	} else
 	//pawn movement
 	if(piece -> type == PAWN){
-		return pawncanmove(piece -> color, x1, y1, x2, y2);
+		if(pawncanmove(piece -> color, x1, y1, x2, y2)){
+			return 1;
+		} else{
+			return pawncanpassant(piece, x1, y1, x2, y2);
+		}
 	} else
 	if(piece -> type == BISHOP){
 		return bishopcanmove(x1, y1, x2, y2);
@@ -235,7 +259,6 @@ int canmove(piece* piece, int x1, int y1, int x2, int y2){
 		return knightcanmove(x1, y1, x2, y2);
 	} else
 	if(piece -> type == ROOK){
-		piece -> cancastle = 0;
 		return rookcanmove(x1, y1, x2, y2);
 	} else
 	if(piece -> type == QUEEN){
@@ -243,13 +266,53 @@ int canmove(piece* piece, int x1, int y1, int x2, int y2){
 	} else
 	if(piece -> type == KING){
 		if(kingcanmove(x1, y1, x2, y2)){
-			piece -> cancastle = 0;
 			return 1;
 		} else{
-			return kingcancastle(piece, x1, y1, x2);
+			return kingcancastle(piece, x1, y1, x2, y2);
 		}
 	}
 	return 0;
+}
+
+void movepiece(int x1, int y1, int x2, int y2){
+	piece_free(board[x2][y2]);
+	board[x2][y2] = board[x1][y1];
+	board[x1][y1] = nullptr;
+}
+
+void passant(){
+
+}
+
+void castle(int x1, int y1, int x2){
+	int dx = -1;
+	if(x1 < x2){
+		x2 = 7;
+		dx = 1;
+	} else{
+		x2 = 0;
+	}
+	movepiece(x2, y1, x1 + dx, y1);
+}
+
+void checkmove(piece* selected, int selected_x, int selected_y, int destination_x, int destination_y){
+	//if king is castling
+	if(selected -> type == KING && abs(destination_x - selected_x) == 2){
+		//move rook
+		castle(selected_x, selected_y, destination_x);
+	}
+	//if moving a king or rook set cancastle false
+	if(selected -> type == KING || selected -> type == ROOK){
+		selected -> cancastle = 0;
+	}
+	//if pawn moves 2, canpassant
+	if(selected -> type == PAWN && abs(destination_y - selected_y) == 2){
+		selected -> canpassant = 1;
+	}
+	//if performing en passant, take pawn
+	if(selected -> type == PAWN && selected_x != destination_x && !board[destination_x][destination_y]){
+		board[destination_x][selected_y] = nullptr;
+	}
 }
 
 int main(){
@@ -413,10 +476,11 @@ int main(){
 						} else
 						//if moving piece via click
 						if(canmove(selected, selected_x, selected_y, click_x, click_y)){
+							//check if piece statuses changing
+							checkmove(selected, selected_x, selected_y, click_x, click_y);
 							//"take" any pieces at destination
-							piece_free(board[click_x][click_y]);
-							board[click_x][click_y] = selected;
-							board[selected_x][selected_y] = nullptr;
+							movepiece(selected_x, selected_y, click_x, click_y);
+							//deselect piece
 							selected = nullptr;
 							//change turns
 							turn = !turn;
@@ -431,12 +495,14 @@ int main(){
 					} else
 					//if moving piece via click and drag
 					if(canmove(selected, selected_x, selected_y, release_x, release_y)){
+						//check if piece statuses changing
+						checkmove(selected, selected_x, selected_y, release_x, release_y);
 						//if mouse on another piece's tile, take piece
-						piece_free(board[release_x][release_y]);
-						board[release_x][release_y] = selected;
-						board[selected_x][selected_y] = nullptr;
+						movepiece(selected_x, selected_y, release_x, release_y);
+						//deselect
 						selected = nullptr;
-						turn = 1 - turn;
+						//change turns
+						turn = !turn;
 					} else
 					if(!firstclick){
 						firstclick = 1;
@@ -450,7 +516,6 @@ int main(){
 			selected_x = -1;
 			selected_y = -1;
 		}
-
 		//draws chess board
 		for(int y = 0; y < 8; y++){
 			for(int x = 0; x < 8; x++){
@@ -467,6 +532,11 @@ int main(){
 				doge_setcolor(1, 1, 1);
 				if(board[x][7 - y]){
 					doge_draw_image(piece_image(board[x][7-y]), x * tile_size, y * tile_size, tile_size, tile_size);
+					if(board[x][7-y] -> canpassant == 1){
+						if(board[x][7-y] -> color == turn){
+							board[x][7-y] -> canpassant = 0;
+						}
+					}
 				}
 			}
 		}
