@@ -92,6 +92,8 @@ piece* board[8][8];
 
 const int tile = 150;
 
+const int tilehalf = tile / 2;
+
 const int circle = tile / 2.5;
 
 doge_image_t* piece_image(piece* piece){
@@ -320,13 +322,28 @@ int upgradepawn(piece* piece, int y){
 }
 
 void drawupgrades(int color, int x, int y){
-	int tilehalf = tile / 2;
 	int x_tile = x * tile;
 	int y_tile = (7 - y) * tile;
 	doge_draw_image(piecevisual[QUEEN][color] -> image, x_tile, y_tile, tilehalf, tilehalf);
 	doge_draw_image(piecevisual[ROOK][color] -> image, x_tile + tilehalf, y_tile, tilehalf, tilehalf);
-	doge_draw_image(piecevisual[BISHOP][color] -> image, x_tile, y_tile + tilehalf, tilehalf, tilehalf);
-	doge_draw_image(piecevisual[KNIGHT][color] -> image, x_tile + tilehalf, y_tile + tilehalf, tilehalf, tilehalf);
+	doge_draw_image(piecevisual[KNIGHT][color] -> image, x_tile, y_tile + tilehalf, tilehalf, tilehalf);
+	doge_draw_image(piecevisual[BISHOP][color] -> image, x_tile + tilehalf, y_tile + tilehalf, tilehalf, tilehalf);
+}
+
+void pawnupgrade(piece* piece, int x, int y, int mouse_x, int mouse_y){
+	if(mouse_x < (x * tile + tilehalf)){
+		if(mouse_y < (7 - y) * tile + tilehalf){
+			piece -> type = QUEEN;
+		} else{
+			piece -> type = KNIGHT;
+		}
+	} else{
+		if(mouse_y < (7 - y) * tile + tilehalf){
+			piece -> type = ROOK;
+		} else{
+			piece -> type = BISHOP;
+		}
+	}
 }
 
 int main(){
@@ -541,6 +558,14 @@ int main(){
 						if(!firstclick){
 							firstclick = 1;
 						}
+					}
+				} else{
+					if(!mouse_clicked && mouse_x_tile == upgrading_x && mouse_y_tile == upgrading_y){
+						pawnupgrade(board[upgrading_x][upgrading_y], upgrading_x, upgrading_y, mouse_x, mouse_y);
+						upgrading = 0;
+						turn = !turn;
+						upgrading_x = -1;
+						upgrading_y = -1;
 					}
 				}
 				mouse_clicked = doge_window_mousepressed(window, DOGE_MOUSE_BUTTON_LEFT);
